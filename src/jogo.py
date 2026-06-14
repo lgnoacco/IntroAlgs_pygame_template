@@ -53,6 +53,10 @@ def _resetar_estado():
         "frames_invencivel": 0,
         "frames_hit": 0,
         "faixa_atual": 1,
+        # --- ATUALIZAÇÃO FRENTE 3 ---
+        "entrega_ativa": False,     # Diz se a maleta está na tela
+        "entrega_timer": 0.0,       # Cronômetro para nascer o item
+        "vel_entrega": 350,         # Velocidade que a entrega desce
     }
 
 def executar_jogo():
@@ -64,6 +68,11 @@ def executar_jogo():
 
     player_image = pegar_sprite(CAMINHO_SPRITES, x=110, y=120, width=190, height=190, scale=0.5)
     obs_image    = pegar_sprite(CAMINHO_SPRITES, x=905, y=1060, width=200, height=130, scale=0.5)
+    
+    # --- ATUALIZAÇÃO FRENTE 3 ---
+    # Cria um quadrado verde neon de 40x40 pixels como placeholder
+    item_image = pygame.Surface((40, 40))
+    item_image.fill((0, 255, 128))
 
     FAIXAS = [
         LARGURA_TELA // 2 - 120,
@@ -84,7 +93,14 @@ def executar_jogo():
         rect = obs_image.get_rect(centerx=FAIXAS[faixa], y=-150)
         return {"imagem": obs_image, "rect": rect}
 
+    # --- ATUALIZAÇÃO FRENTE 3 ---
+    def nova_entrega():
+        faixa = random.choice([0, 1, 2])
+        rect = item_image.get_rect(centerx=FAIXAS[faixa], y=-100)
+        return {"imagem": item_image, "rect": rect}
+
     obstaculo = novo_obstaculo()
+    entrega   = nova_entrega() 
     recorde   = carregar_recorde(CAMINHO_RECORDE)
     estado    = EstadoJogo.MENU
     jogo      = _resetar_estado()
@@ -139,6 +155,28 @@ def executar_jogo():
             jogo["offset_pista"] = (jogo["offset_pista"] + vel_pista_atual * dt) % 128
             obstaculo["rect"].y += vel_obs_atual * dt
 
+            # =================================================================
+            # LOGICA DA FRENTE 3: GERENCIAMENTO DE COLETÁVEIS (ENTREGAS)
+            # =================================================================
+            INTERVALO_SPAWN = 5.0 
+
+            if not jogo["entrega_ativa"]:
+                jogo["entrega_timer"] += dt
+                if jogo["entrega_timer"] >= INTERVALO_SPAWN: # Corrigido aqui (jogo)
+                    entrega = nova_entrega()
+                    jogo["entrega_ativa"] = True
+                    jogo["entrega_timer"] = 0.0
+            else:
+                entrega["rect"].y += (jogo["vel_entrega"] + jogo["aceleracao"] * 0.5) * dt
+                
+                if entrega["rect"].y > ALTURA_TELA:
+                    jogo["entrega_ativa"] = False
+
+                elif verificar_colisao(jogador["rect"], entrega["rect"]):
+                    jogo["pontos"] = calcular_pontos(jogo["pontos"], 50) 
+                    jogo["entrega_ativa"] = False 
+            # =================================================================
+        
             if obstaculo["rect"].y > ALTURA_TELA:
                 obstaculo = novo_obstaculo()
                 jogo["pontos"] = calcular_pontos(jogo["pontos"], 10)
@@ -163,7 +201,7 @@ def executar_jogo():
             pygame.display.set_caption(
                 f"{TITULO_JOGO} | Pontos: {jogo['pontos']} "
                 f"| Vidas: {jogo['vidas']} | Recorde: {recorde}"
-            )
+                )
 
         tela.fill(CINZA)
 
@@ -184,10 +222,16 @@ def executar_jogo():
             or jogo["frames_invencivel"] == 0
             or (jogo["frames_invencivel"] // 5) % 2 == 0
         )
+        
+        # Desenha os elementos na tela (Duplicações removidas)
         if mostrar_jogador:
             tela.blit(jogador["imagem"], jogador["rect"])
 
         tela.blit(obstaculo["imagem"], obstaculo["rect"])
+        
+        # --- DESENHO FRENTE 3 ---
+        if jogo["entrega_ativa"]:
+            tela.blit(entrega["imagem"], entrega["rect"])
 
         if estado == EstadoJogo.JOGANDO:
             fonte_hud = pygame.font.SysFont(None, 28)
