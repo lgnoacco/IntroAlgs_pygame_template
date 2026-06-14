@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import math
 from enum import Enum
 
 from src.config import (
@@ -42,17 +43,51 @@ def _desenhar_overlay(tela, texto_principal, subtexto, cor_fundo=(0, 0, 0, 160))
     tela.blit(surf_principal, surf_principal.get_rect(center=(LARGURA_TELA // 2, ALTURA_TELA // 2 - 30)))
     tela.blit(surf_sub, surf_sub.get_rect(center=(LARGURA_TELA // 2, ALTURA_TELA // 2 + 30)))
 
-def _resetar_estado():
+def _resetar_estado(modo="Apresentação"):
+    cor_base = list(CINZA) if isinstance(CINZA, tuple) else [50, 50, 50]
+    
+    if modo == "Apresentação":
+        vidas_iniciais = 5
+        vel_pista_inicial = 400
+        vel_obs_inicial = 250
+        pontos_para_nivel = 250
+    else: 
+        vidas_iniciais = 1
+        vel_pista_inicial = 750
+        vel_obs_inicial = 500
+        pontos_para_nivel = 100
+        
     return {
+        "modo": modo,
         "pontos": 0,
-        "vidas": 3,
-        "vel_pista": 600,
-        "vel_obs": 300,
+        "vidas": vidas_iniciais,
+        "nivel": 1,
+        "pontos_para_nivel": pontos_para_nivel,
+        "vel_pista": vel_pista_inicial,
+        "vel_obs": vel_obs_inicial,
         "aceleracao": 0.0,
         "offset_pista": 0,
         "frames_invencivel": 0,
         "frames_hit": 0,
+        "flash_cor": (255, 0, 0, 80),
         "faixa_atual": 1,
+        "entrega_ativa": False,
+        "entrega_timer": 0.0,
+        "vel_entrega": 400,
+        "poca_ativa": False,
+        "poca_timer": 0.0,
+        "shake_frames": 0,
+        "angulo_giro": 0.0,
+        "combo": 1,
+        "cor_fundo": cor_base,
+        "particulas": [],
+        "laser_ativo": False,
+        "laser_estado": "aviso",
+        "laser_timer": 0.0,
+        "laser_faixa": 0,
+        "laser_dano_aplicado": False,
+        "ultimo_foi_duplo": False,
+        "escudo_ativo": False
     }
 
 def executar_jogo():
@@ -64,6 +99,17 @@ def executar_jogo():
 
     player_image = pegar_sprite(CAMINHO_SPRITES, x=110, y=120, width=190, height=190, scale=0.5)
     obs_image    = pegar_sprite(CAMINHO_SPRITES, x=905, y=1060, width=200, height=130, scale=0.5)
+    
+    item_pontos = pygame.Surface((40, 40))
+    item_pontos.fill((0, 255, 128))
+    
+    item_escudo = pygame.Surface((40, 40))
+    item_escudo.fill((0, 150, 255))
+
+    poca_image = pygame.Surface((80, 50), pygame.SRCALPHA)
+    pygame.draw.ellipse(poca_image, (45, 40, 60, 220), (0, 0, 80, 50))
+    pygame.draw.ellipse(poca_image, (0, 255, 255, 100), (15, 10, 50, 20))
+    pygame.draw.ellipse(poca_image, (255, 0, 128, 80), (25, 20, 30, 15))
 
     FAIXAS = [
         LARGURA_TELA // 2 - 120,
@@ -84,12 +130,65 @@ def executar_jogo():
         rect = obs_image.get_rect(centerx=FAIXAS[faixa], y=-150)
         return {"imagem": obs_image, "rect": rect}
 
-    obstaculo = novo_obstaculo()
+    def spawn_duplo():
+        return[
+            {"imagem": obs_image, "rect": obs_image.get_rect(centerx=FAIXAS[0], y=-150)},
+            {"imagem": obs_image, "rect": obs_image.get_rect(centerx=FAIXAS[2], y=-150)}
+        ]
+
+    def nova_entrega():
+        faixa = random.choice([0, 1, 2])
+        tipo = "escudo" if random.random() < 0.25 else "pontos"
+        imagem = item_escudo if tipo == "escudo" else item_pontos
+        rect = imagem.get_rect(centerx=FAIXAS[faixa], y=-100)
+        return {"imagem": imagem, "rect": rect, "tipo": tipo}
+
+    def nova_poca():
+        faixa = random.choice([0, 1, 2])
+        rect = poca_image.get_rect(centerx=FAIXAS[faixa], y=-100)
+        return {"imagem": poca_image, "rect": rect}
+
+    def gerar_linhas_vento():
+        linhas = []
+        for _ in range(15):
+            x = random.choice([random.randint(0, FAIXAS[0]-80), random.randint(FAIXAS[2]+80, LARGURA_TELA)])
+            y = random.randint(0, ALTURA_TELA)
+            comp = random.randint(30, 100)
+            linhas.append([x, y, comp])
+        return linhas
+
+    def gerar_predios():
+        predios = []
+        for i in range(12): 
+            largura = random.randint(40, 120)
+            x = random.randint(0, FAIXAS[0] - 80 - largura)
+            y = random.randint(-ALTURA_TELA, ALTURA_TELA)
+            altura = random.randint(150, 400)
+            cor = (random.randint(5, 12), random.randint(5, 12), random.randint(8, 15))
+            predios.append({"rect": pygame.Rect(x, y, largura, altura), "cor": cor})
+            
+            largura = random.randint(40, 120)
+            x = random.randint(FAIXAS[2] + 80, LARGURA_TELA - largura)
+            y = random.randint(-ALTURA_TELA, ALTURA_TELA)
+            altura = random.randint(150, 400)
+            cor = (random.randint(5, 12), random.randint(5, 12), random.randint(8, 15))
+            predios.append({"rect": pygame.Rect(x, y, largura, altura), "cor": cor})
+        return predios
+
+    obstaculos = [novo_obstaculo()]
+    entrega   = nova_entrega() 
+    poca      = nova_poca()
+    linhas_vento = gerar_linhas_vento()
+    predios = gerar_predios()
+
     recorde   = carregar_recorde(CAMINHO_RECORDE)
     estado    = EstadoJogo.MENU
-    jogo      = _resetar_estado()
+    
+    modo_selecionado = "Apresentação"
+    jogo = _resetar_estado(modo_selecionado)
 
     rodando = True
+    tempo_spawn = 0
 
     while rodando:
         dt = relogio.tick(FPS) / 1000.0
@@ -105,13 +204,22 @@ def executar_jogo():
                     elif estado == EstadoJogo.PAUSADO:
                         estado = EstadoJogo.JOGANDO
 
+                if estado == EstadoJogo.MENU:
+                    if evento.key == pygame.K_LEFT:
+                        modo_selecionado = "Apresentação"
+                    elif evento.key == pygame.K_RIGHT:
+                        modo_selecionado = "Souls-like"
+
                 if evento.key == pygame.K_RETURN or evento.key == pygame.K_SPACE:
                     if estado == EstadoJogo.MENU:
                         estado = EstadoJogo.JOGANDO
-                        jogo   = _resetar_estado()
+                        jogo   = _resetar_estado(modo_selecionado)
                         jogador["rect"].centerx = FAIXAS[jogo["faixa_atual"]]
                         jogador["alvo_x"] = FAIXAS[jogo["faixa_atual"]]
-                        obstaculo = novo_obstaculo()
+                        obstaculos = [novo_obstaculo()]
+                        entrega = nova_entrega()
+                        poca = nova_poca()
+                        predios = gerar_predios()
                     elif estado == EstadoJogo.GAME_OVER:
                         estado = EstadoJogo.MENU
 
@@ -124,6 +232,15 @@ def executar_jogo():
                         jogador["alvo_x"] = FAIXAS[jogo["faixa_atual"]]
 
         if estado == EstadoJogo.JOGANDO:
+            novo_nivel = (jogo["pontos"] // jogo["pontos_para_nivel"]) + 1
+            if novo_nivel > jogo["nivel"]:
+                jogo["nivel"] = novo_nivel
+                jogo["vel_pista"] += 120 
+                jogo["vel_obs"] += 60    
+                
+                jogo["cor_fundo"][0] = min(255, jogo["cor_fundo"][0] + 15)
+                jogo["cor_fundo"][2] = min(255, jogo["cor_fundo"][2] + 20)
+
             if jogador["rect"].centerx != jogador["alvo_x"]:
                 distancia = jogador["alvo_x"] - jogador["rect"].centerx
                 passo = round(VEL_TRANSICAO * dt)
@@ -132,24 +249,177 @@ def executar_jogo():
                 else:
                     jogador["rect"].centerx += passo if distancia > 0 else -passo
 
-            jogo["aceleracao"] += 10 * dt
+            jogo["aceleracao"] += 12 * dt
             vel_pista_atual = jogo["vel_pista"] + jogo["aceleracao"]
-            vel_obs_atual = jogo["vel_obs"] + (jogo["aceleracao"] * 0.5)
+            vel_obs_atual = jogo["vel_obs"] + (jogo["aceleracao"] * 0.4)
+            
+            if jogo["shake_frames"] > 0:
+                jogo["shake_frames"] -= 1
+            
+            if jogo["angulo_giro"] > 0:
+                jogo["angulo_giro"] -= 1000 * dt 
+                if jogo["angulo_giro"] < 0:
+                    jogo["angulo_giro"] = 0.0
+
+            if jogo["frames_invencivel"] == 0 or (jogo["frames_invencivel"] // 5) % 2 == 0:
+                jogo["particulas"].append({
+                    "x": jogador["rect"].centerx,
+                    "y": jogador["rect"].bottom - 20,
+                    "raio": random.uniform(5, 9)
+                })
+
+            for p in jogo["particulas"][:]:
+                p["y"] += vel_pista_atual * dt 
+                p["raio"] -= 20 * dt 
+                if p["raio"] <= 0 or p["y"] > ALTURA_TELA:
+                    jogo["particulas"].remove(p)
+
+            for predio in predios:
+                predio["rect"].y += (vel_pista_atual * 0.3) * dt 
+                if predio["rect"].y > ALTURA_TELA:
+                    predio["rect"].y = random.randint(-400, -100)
+                    predio["rect"].height = random.randint(150, 400)
+
+            distancia_segura = 550 
+            intervalo_spawn_dinamico = distancia_segura / vel_obs_atual
+
+            tempo_spawn += dt
+            if tempo_spawn >= intervalo_spawn_dinamico:
+                if random.randint(1, 3) == 1 and not jogo["poca_ativa"]:
+                    obstaculos.extend(spawn_duplo())
+                    jogo["ultimo_foi_duplo"] = True
+                else:
+                    novo_obs = novo_obstaculo()
+                    if jogo.get("ultimo_foi_duplo", False):
+                        if novo_obs["rect"].centerx == FAIXAS[1]:
+                            novo_obs["rect"].centerx = FAIXAS[random.choice([0, 2])]
+                    obstaculos.append(novo_obs)
+                    jogo["ultimo_foi_duplo"] = False
+                tempo_spawn = 0
 
             jogo["offset_pista"] = (jogo["offset_pista"] + vel_pista_atual * dt) % 128
-            obstaculo["rect"].y += vel_obs_atual * dt
+            
+            for linha in linhas_vento:
+                linha[1] += (vel_pista_atual * 1.5) * dt
+                if linha[1] > ALTURA_TELA:
+                    linha[1] = -linha[2]
+                    linha[0] = random.choice([random.randint(0, FAIXAS[0]-80), random.randint(FAIXAS[2]+80, LARGURA_TELA)])
 
-            if obstaculo["rect"].y > ALTURA_TELA:
-                obstaculo = novo_obstaculo()
-                jogo["pontos"] = calcular_pontos(jogo["pontos"], 10)
+            for obstaculo in obstaculos[:]:
+                obstaculo["rect"].y += vel_obs_atual * dt
+                if obstaculo["rect"].y > ALTURA_TELA:
+                    obstaculos.remove(obstaculo)
+                    jogo["pontos"] = calcular_pontos(jogo["pontos"], 10)
+
+            if not jogo["laser_ativo"]:
+                chance_base = 0.002 if jogo["modo"] == "Apresentação" else 0.005
+                if random.random() < chance_base + (jogo["nivel"] * 0.0005):
+                    jogo["laser_ativo"] = True
+                    jogo["laser_estado"] = "aviso"
+                    jogo["laser_timer"] = 1.5
+                    jogo["laser_faixa"] = random.choice([0, 1, 2])
+                    jogo["laser_dano_aplicado"] = False
+            else:
+                jogo["laser_timer"] -= dt
+                if jogo["laser_estado"] == "aviso" and jogo["laser_timer"] <= 0:
+                    jogo["laser_estado"] = "tiro"
+                    jogo["laser_timer"] = 0.4 
+                    jogo["shake_frames"] = 20 
+                elif jogo["laser_estado"] == "tiro":
+                    if jogo["laser_timer"] <= 0:
+                        jogo["laser_ativo"] = False
+                    elif jogo["faixa_atual"] == jogo["laser_faixa"] and not jogo["laser_dano_aplicado"] and jogo["frames_invencivel"] <= 0:
+                        if jogo["escudo_ativo"]:
+                            jogo["escudo_ativo"] = False
+                            jogo["frames_invencivel"] = 60
+                            jogo["frames_hit"] = 10
+                            jogo["shake_frames"] = 20
+                            jogo["flash_cor"] = (0, 150, 255, 100)
+                            jogo["laser_dano_aplicado"] = True
+                        else:
+                            jogo["vidas"] = tomar_dano(jogo["vidas"], 1)
+                            jogo["frames_invencivel"] = 60
+                            jogo["frames_hit"] = 10
+                            jogo["shake_frames"] = 40
+                            jogo["flash_cor"] = (255, 0, 0, 80)
+                            jogo["combo"] = 1
+                            jogo["laser_dano_aplicado"] = True
+
+            INTERVALO_POCA = 7.0 
+            if not jogo["poca_ativa"]:
+                jogo["poca_timer"] += dt
+                if jogo["poca_timer"] >= INTERVALO_POCA:
+                    if len(obstaculos) <= 1:
+                        poca = nova_poca()
+                        jogo["poca_ativa"] = True
+                        jogo["poca_timer"] = 0.0
+                    else:
+                        jogo["poca_timer"] = INTERVALO_POCA
+            else:
+                poca["rect"].y += vel_pista_atual * dt
+                if poca["rect"].y > ALTURA_TELA:
+                    jogo["poca_ativa"] = False
+                elif verificar_colisao(jogador["rect"], poca["rect"]) and jogo["angulo_giro"] == 0:
+                    jogo["poca_ativa"] = False
+                    if jogo["escudo_ativo"]:
+                        jogo["escudo_ativo"] = False
+                        jogo["frames_invencivel"] = 30
+                        jogo["frames_hit"] = 10
+                        jogo["shake_frames"] = 15
+                        jogo["flash_cor"] = (0, 150, 255, 100) 
+                    else:
+                        jogo["shake_frames"] = 15
+                        jogo["angulo_giro"] = 360.0 
+                        jogo["combo"] = 1 
+                        opcoes_derrapagem = []
+                        if jogo["faixa_atual"] > 0: opcoes_derrapagem.append(-1)
+                        if jogo["faixa_atual"] < 2: opcoes_derrapagem.append(1) 
+                        jogo["faixa_atual"] += random.choice(opcoes_derrapagem)
+                        jogador["alvo_x"] = FAIXAS[jogo["faixa_atual"]]
+
+            INTERVALO_ENTREGA = 4.0 
+            if not jogo["entrega_ativa"]:
+                jogo["entrega_timer"] += dt
+                if jogo["entrega_timer"] >= INTERVALO_ENTREGA:
+                    entrega = nova_entrega()
+                    jogo["entrega_ativa"] = True
+                    jogo["entrega_timer"] = 0.0
+            else:
+                entrega["rect"].y += (jogo["vel_entrega"] + jogo["aceleracao"] * 0.4) * dt
+                if entrega["rect"].y > ALTURA_TELA:
+                    jogo["entrega_ativa"] = False
+                elif verificar_colisao(jogador["rect"], entrega["rect"]):
+                    if entrega["tipo"] == "escudo":
+                        jogo["escudo_ativo"] = True
+                    else:
+                        jogo["combo"] = min(jogo["combo"] + 1, 5)
+                        jogo["pontos"] = calcular_pontos(jogo["pontos"], 50 * jogo["combo"]) 
+                    jogo["entrega_ativa"] = False 
 
             if jogo["frames_invencivel"] > 0:
                 jogo["frames_invencivel"] -= 1
-            elif verificar_colisao(jogador["rect"], obstaculo["rect"]):
-                jogo["vidas"]            = tomar_dano(jogo["vidas"], 1)
-                jogo["frames_invencivel"] = 60
-                jogo["frames_hit"]        = 10
-                obstaculo = novo_obstaculo()
+            else:
+                colidiu = False
+                for obs in obstaculos:
+                    if verificar_colisao(jogador["rect"], obs["rect"]):
+                        colidiu = True
+                        obstaculos.remove(obs)
+                        break
+                
+                if colidiu:
+                    if jogo["escudo_ativo"]:
+                        jogo["escudo_ativo"] = False
+                        jogo["frames_invencivel"] = 60
+                        jogo["frames_hit"] = 10
+                        jogo["shake_frames"] = 25 
+                        jogo["flash_cor"] = (0, 150, 255, 100)
+                    else:
+                        jogo["vidas"]             = tomar_dano(jogo["vidas"], 1)
+                        jogo["frames_invencivel"] = 60
+                        jogo["frames_hit"]        = 10
+                        jogo["shake_frames"]      = 40 
+                        jogo["flash_cor"]         = (255, 0, 0, 80)
+                        jogo["combo"]             = 1 
 
             if jogo["frames_hit"] > 0:
                 jogo["frames_hit"] -= 1
@@ -160,42 +430,89 @@ def executar_jogo():
                     recorde = jogo["pontos"]
                     salvar_recorde(CAMINHO_RECORDE, recorde)
 
-            pygame.display.set_caption(
-                f"{TITULO_JOGO} | Pontos: {jogo['pontos']} "
-                f"| Vidas: {jogo['vidas']} | Recorde: {recorde}"
-            )
+            pygame.display.set_caption(f"{TITULO_JOGO} | Nível: {jogo['nivel']} | Combo: x{jogo['combo']} | Pts: {jogo['pontos']}")
 
-        tela.fill(CINZA)
+        tela_virtual = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
+        tela_virtual.fill(tuple(jogo["cor_fundo"]))
+
+        for predio in predios:
+            pygame.draw.rect(tela_virtual, predio["cor"], predio["rect"])
 
         if jogo["frames_hit"] > 0:
             flash = pygame.Surface((LARGURA_TELA, ALTURA_TELA), pygame.SRCALPHA)
-            flash.fill((255, 0, 0, 80))
-            tela.blit(flash, (0, 0))
+            flash.fill(jogo["flash_cor"])
+            tela_virtual.blit(flash, (0, 0))
 
-        pygame.draw.line(tela, (0, 255, 255), (FAIXAS[0] - 60, 0), (FAIXAS[0] - 60, ALTURA_TELA), 2)
-        pygame.draw.line(tela, (0, 255, 255), (FAIXAS[2] + 60, 0), (FAIXAS[2] + 60, ALTURA_TELA), 2)
+        pygame.draw.line(tela_virtual, (0, 255, 255), (FAIXAS[0] - 60, 0), (FAIXAS[0] - 60, ALTURA_TELA), 2)
+        pygame.draw.line(tela_virtual, (0, 255, 255), (FAIXAS[2] + 60, 0), (FAIXAS[2] + 60, ALTURA_TELA), 2)
         
         for y in range(-128, ALTURA_TELA, 128):
-            pygame.draw.rect(tela, (255, 255, 255), (FAIXAS[0] + 60 - 2, y + int(jogo["offset_pista"]), 4, 64))
-            pygame.draw.rect(tela, (255, 255, 255), (FAIXAS[1] + 60 - 2, y + int(jogo["offset_pista"]), 4, 64))
+            pygame.draw.rect(tela_virtual, (255, 255, 255), (FAIXAS[0] + 60 - 2, y + int(jogo["offset_pista"]), 4, 64))
+            pygame.draw.rect(tela_virtual, (255, 255, 255), (FAIXAS[1] + 60 - 2, y + int(jogo["offset_pista"]), 4, 64))
 
-        mostrar_jogador = (
-            estado != EstadoJogo.JOGANDO
-            or jogo["frames_invencivel"] == 0
-            or (jogo["frames_invencivel"] // 5) % 2 == 0
-        )
+        if jogo["laser_ativo"]:
+            x_laser = FAIXAS[jogo["laser_faixa"]] - 50
+            if jogo["laser_estado"] == "aviso":
+                alpha = int((math.sin(pygame.time.get_ticks() * 0.01) + 1) * 60) + 20
+                surface_laser = pygame.Surface((100, ALTURA_TELA), pygame.SRCALPHA)
+                surface_laser.fill((255, 0, 0, alpha))
+                tela_virtual.blit(surface_laser, (x_laser, 0))
+            elif jogo["laser_estado"] == "tiro":
+                pygame.draw.rect(tela_virtual, (255, 20, 50), (x_laser, 0, 100, ALTURA_TELA))
+                pygame.draw.rect(tela_virtual, (255, 255, 255), (x_laser + 25, 0, 50, ALTURA_TELA))
+
+        if jogo["poca_ativa"]:
+            tela_virtual.blit(poca["imagem"], poca["rect"])
+
+        if jogo["entrega_ativa"]:
+            tela_virtual.blit(entrega["imagem"], entrega["rect"])
+
+        for obstaculo in obstaculos:
+            tela_virtual.blit(obstaculo["imagem"], obstaculo["rect"])
+
+        for p in jogo["particulas"]:
+            pygame.draw.circle(tela_virtual, (0, 255, 255), (int(p["x"]), int(p["y"])), int(p["raio"]))
+
+        mostrar_jogador = (estado != EstadoJogo.JOGANDO or jogo["frames_invencivel"] == 0 or (jogo["frames_invencivel"] // 5) % 2 == 0)
+        
         if mostrar_jogador:
-            tela.blit(jogador["imagem"], jogador["rect"])
+            if jogo["angulo_giro"] > 0:
+                imagem_rotacionada = pygame.transform.rotate(jogador["imagem"], jogo["angulo_giro"])
+                rect_rotacionado = imagem_rotacionada.get_rect(center=jogador["rect"].center)
+                tela_virtual.blit(imagem_rotacionada, rect_rotacionado)
+            else:
+                tela_virtual.blit(jogador["imagem"], jogador["rect"])
+            
+            if jogo["escudo_ativo"]:
+                raio_escudo = 110 + math.sin(pygame.time.get_ticks() * 0.01) * 5
+                pygame.draw.circle(tela_virtual, (0, 150, 255), jogador["rect"].center, int(raio_escudo), 3)
 
-        tela.blit(obstaculo["imagem"], obstaculo["rect"])
+        # Shake aplicado apenas se NÃO estiver em Game Over
+        if estado != EstadoJogo.GAME_OVER and jogo["shake_frames"] > 0:
+            shake_x = random.randint(-10, 10)
+            shake_y = random.randint(-10, 10)
+        else:
+            shake_x = 0
+            shake_y = 0
+            
+        tela.blit(tela_virtual, (shake_x, shake_y))
 
         if estado == EstadoJogo.JOGANDO:
             fonte_hud = pygame.font.SysFont(None, 28)
-            hud = fonte_hud.render(f"Vidas: {jogo['vidas']}  Pts: {jogo['pontos']}", True, (255, 255, 255))
+            hud = fonte_hud.render(f"Nível: {jogo['nivel']}  Vidas: {jogo['vidas']}  Pts: {jogo['pontos']}", True, (255, 255, 255))
             tela.blit(hud, (10, 10))
+            if jogo["combo"] > 1:
+                fonte_combo = pygame.font.SysFont(None, 40, bold=True)
+                cor_combo = (0, 255, 128) if (pygame.time.get_ticks() // 200) % 2 == 0 else (255, 255, 255)
+                texto_combo = fonte_combo.render(f"COMBO x{jogo['combo']}!", True, cor_combo)
+                tela.blit(texto_combo, (LARGURA_TELA // 2 - texto_combo.get_width() // 2, 80))
 
         if estado == EstadoJogo.MENU:
-            _desenhar_overlay(tela, TITULO_JOGO, "ENTER / ESPAÇO para jogar")
+            texto_menu = f"< {modo_selecionado} >"
+            _desenhar_overlay(tela, TITULO_JOGO, texto_menu)
+            fonte_pequena = pygame.font.SysFont(None, 24)
+            dica = fonte_pequena.render("Use as setas para mudar o modo e ENTER para jogar", True, (150, 150, 150))
+            tela.blit(dica, dica.get_rect(center=(LARGURA_TELA // 2, ALTURA_TELA // 2 + 70)))
         elif estado == EstadoJogo.PAUSADO:
             _desenhar_overlay(tela, "PAUSADO", "ESC para continuar")
         elif estado == EstadoJogo.GAME_OVER:
