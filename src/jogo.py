@@ -66,13 +66,10 @@ def executar_jogo():
     pygame.display.set_caption(TITULO_JOGO)
     relogio = pygame.time.Clock()
 
-    player_image = pegar_sprite(CAMINHO_SPRITES, x=110, y=120, width=190, height=190, scale=0.5)
-    obs_image    = pegar_sprite(CAMINHO_SPRITES, x=905, y=1060, width=200, height=130, scale=0.5)
-    
-    # --- ATUALIZAÇÃO FRENTE 3 ---
-    # Cria um quadrado verde neon de 40x40 pixels como placeholder
-    item_image = pygame.Surface((40, 40))
-    item_image.fill((0, 255, 128))
+    player_image = pegar_sprite(CAMINHO_SPRITES, x=0,    y=0, width=445, height=441, scale=0.2)
+    obs_image    = pegar_sprite(CAMINHO_SPRITES, x=445,  y=0, width=445, height=441, scale=0.2)
+    cone_image   = pegar_sprite(CAMINHO_SPRITES, x=890,  y=0, width=445, height=441, scale=0.2)
+    item_image   = pegar_sprite(CAMINHO_SPRITES, x=1335, y=0, width=448, height=441, scale=0.2)
 
     FAIXAS = [
         LARGURA_TELA // 2 - 120,

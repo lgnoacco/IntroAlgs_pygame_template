@@ -15,4 +15,4 @@ PRETO        = (0, 0, 0)
 
 # Persistência e Recursos Locais
 CAMINHO_RECORDE = "data/recorde.txt"
-CAMINHO_SPRITES = "assets/imagens/spritesheet.bmp"
+CAMINHO_SPRITES = "assets/imagens/spritesheet.png"
