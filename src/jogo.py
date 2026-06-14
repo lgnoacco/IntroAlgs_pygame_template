@@ -83,13 +83,27 @@ def executar_jogo():
         faixa = random.choice([0, 1, 2])
         rect = obs_image.get_rect(centerx=FAIXAS[faixa], y=-150)
         return {"imagem": obs_image, "rect": rect}
-
-    obstaculo = novo_obstaculo()
+    
+    def spawn_duplo():
+        return[
+            {
+                "imagem": obs_image,
+                "rect": obs_image.get_rect(centerx=FAIXAS[0], y=-150)
+            },
+            {
+                "imagem": obs_image,
+                "rect": obs_image.get_rect(centerx=FAIXAS[2], y=-150)
+            }
+        ]
+    
+    obstaculos = [novo_obstaculo()]
     recorde   = carregar_recorde(CAMINHO_RECORDE)
     estado    = EstadoJogo.MENU
     jogo      = _resetar_estado()
 
     rodando = True
+    tempo_spawn = 0
+    intervalo_spawn = 1.5
 
     while rodando:
         dt = relogio.tick(FPS) / 1000.0
@@ -111,7 +125,7 @@ def executar_jogo():
                         jogo   = _resetar_estado()
                         jogador["rect"].centerx = FAIXAS[jogo["faixa_atual"]]
                         jogador["alvo_x"] = FAIXAS[jogo["faixa_atual"]]
-                        obstaculo = novo_obstaculo()
+                        obstaculos = [novo_obstaculo()]
                     elif estado == EstadoJogo.GAME_OVER:
                         estado = EstadoJogo.MENU
 
@@ -135,21 +149,32 @@ def executar_jogo():
             jogo["aceleracao"] += 10 * dt
             vel_pista_atual = jogo["vel_pista"] + jogo["aceleracao"]
             vel_obs_atual = jogo["vel_obs"] + (jogo["aceleracao"] * 0.5)
+            tempo_spawn += dt
+            if tempo_spawn >= intervalo_spawn:
+                if random.randint(1,3) == 1:
+                    obstaculos.extend(spawn_duplo())
+                else:
+                    obstaculos.append(novo_obstaculo())
+                tempo_spawn = 0
 
             jogo["offset_pista"] = (jogo["offset_pista"] + vel_pista_atual * dt) % 128
-            obstaculo["rect"].y += vel_obs_atual * dt
+            for obstaculo in obstaculos:
+                obstaculo["rect"].y += vel_obs_atual * dt
 
-            if obstaculo["rect"].y > ALTURA_TELA:
-                obstaculo = novo_obstaculo()
-                jogo["pontos"] = calcular_pontos(jogo["pontos"], 10)
+            for obstaculo in obstaculos[:]:
+                if obstaculo["rect"].y > ALTURA_TELA:
+                    obstaculos.remove(obstaculo)
+                    jogo["pontos"] = calcular_pontos(jogo["pontos"], 10)
 
             if jogo["frames_invencivel"] > 0:
                 jogo["frames_invencivel"] -= 1
-            elif verificar_colisao(jogador["rect"], obstaculo["rect"]):
+            elif any(
+                verificar_colisao(jogador["rect"], obs["rect"])
+                for obs in obstaculos
+            ):
                 jogo["vidas"]            = tomar_dano(jogo["vidas"], 1)
                 jogo["frames_invencivel"] = 60
                 jogo["frames_hit"]        = 10
-                obstaculo = novo_obstaculo()
 
             if jogo["frames_hit"] > 0:
                 jogo["frames_hit"] -= 1
@@ -187,7 +212,8 @@ def executar_jogo():
         if mostrar_jogador:
             tela.blit(jogador["imagem"], jogador["rect"])
 
-        tela.blit(obstaculo["imagem"], obstaculo["rect"])
+        for obstaculo in obstaculos:
+            tela.blit(obstaculo["imagem"], obstaculo["rect"])
 
         if estado == EstadoJogo.JOGANDO:
             fonte_hud = pygame.font.SysFont(None, 28)
