@@ -43,7 +43,7 @@ def _desenhar_overlay(tela, texto_principal, subtexto, cor_fundo=(0, 0, 0, 160))
     tela.blit(surf_sub, surf_sub.get_rect(center=(LARGURA_TELA // 2, ALTURA_TELA // 2 + 30)))
 
 def _resetar_estado(modo="Apresentação"):
-    cor_base = list(CINZA) if isinstance(CINZA, tuple) else [50, 50, 50]
+    cor_base = [10, 10, 20] # Fundo noturno otimizado para contraste
 
     if modo == "Apresentação":
         vidas_iniciais = 5
@@ -91,6 +91,16 @@ def _resetar_estado(modo="Apresentação"):
 
 def executar_jogo():
     pygame.init()
+    
+    # Inicializa o motor de áudio com try/except para segurança na apresentação
+    pygame.mixer.init()
+    try:
+        pygame.mixer.music.load("assets/sons/trilha.mp3") 
+        pygame.mixer.music.set_volume(0.05)
+        pygame.mixer.music.play(-1)
+    except Exception as e:
+        print(f"ERRO DE ÁUDIO: {e}")
+        pass # Roda no mudo tranquilamente se o arquivo não estiver lá
 
     tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
     pygame.display.set_caption(TITULO_JOGO)
@@ -454,9 +464,12 @@ def executar_jogo():
         tela_virtual = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
         tela_virtual.fill(tuple(jogo["cor_fundo"]))
 
-        # Prédios de fundo
+        # Prédios de fundo (Estilo Neon)
         for predio in predios:
-            pygame.draw.rect(tela_virtual, predio["cor"], predio["rect"])
+            # Corpo do prédio (preto/cinza muito escuro para dar contraste)
+            pygame.draw.rect(tela_virtual, (15, 15, 25), predio["rect"])
+            # Contorno Neon usando a cor original gerada no seu código
+            pygame.draw.rect(tela_virtual, predio["cor"], predio["rect"], 3)
 
         # Flash de dano
         if jogo["frames_hit"] > 0:
@@ -465,8 +478,8 @@ def executar_jogo():
             tela_virtual.blit(flash, (0, 0))
 
         # Bordas da pista
-        pygame.draw.line(tela_virtual, (0, 255, 255), (FAIXAS[0] - 60, 0), (FAIXAS[0] - 60, ALTURA_TELA), 2)
-        pygame.draw.line(tela_virtual, (0, 255, 255), (FAIXAS[2] + 60, 0), (FAIXAS[2] + 60, ALTURA_TELA), 2)
+        pygame.draw.line(tela_virtual, (0, 255, 255), (FAIXAS[0] - 60, 0), (FAIXAS[0] - 60, ALTURA_TELA), 3)
+        pygame.draw.line(tela_virtual, (0, 255, 255), (FAIXAS[2] + 60, 0), (FAIXAS[2] + 60, ALTURA_TELA), 3)
 
         # Marcações de faixa animadas
         for y in range(-128, ALTURA_TELA, 128):
@@ -509,6 +522,13 @@ def executar_jogo():
         )
 
         if mostrar_jogador:
+            # Sombra da Moto (Efeito de Flutuação/Hoverbike)
+            sombra_rect = pygame.Rect(0, 0, 45, 20)
+            sombra_rect.midtop = (jogador["rect"].centerx, jogador["rect"].bottom - 15)
+            sombra_surf = pygame.Surface((sombra_rect.width, sombra_rect.height), pygame.SRCALPHA)
+            pygame.draw.ellipse(sombra_surf, (0, 0, 0, 140), sombra_surf.get_rect())
+            tela_virtual.blit(sombra_surf, sombra_rect)
+
             if jogo["angulo_giro"] > 0:
                 imagem_rotacionada = pygame.transform.rotate(jogador["imagem"], jogo["angulo_giro"])
                 rect_rotacionado = imagem_rotacionada.get_rect(center=jogador["rect"].center)
@@ -544,7 +564,7 @@ def executar_jogo():
         # Overlays de estado
         if estado == EstadoJogo.MENU:
             texto_menu = f"< {modo_selecionado} >"
-            _desenhar_overlay(tela, TITULO_JOGO, texto_menu)
+            _desenhar_overlay(tela, "cyberdelivery", texto_menu) # Título atualizado aqui
             fonte_pequena = pygame.font.SysFont(None, 24)
             dica = fonte_pequena.render("Use as setas para mudar o modo e ENTER para jogar", True, (150, 150, 150))
             tela.blit(dica, dica.get_rect(center=(LARGURA_TELA // 2, ALTURA_TELA // 2 + 70)))

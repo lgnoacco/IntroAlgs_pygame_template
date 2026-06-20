@@ -1,91 +1,85 @@
-# Nome do Jogo
-
+Cyberdelivery
 Projeto final da disciplina de Introdução a Algoritmos/Programação, desenvolvido com Python e Pygame.
 
-Este repositório é um template para os grupos da disciplina. A proposta é começar com uma base funcional e evoluir o jogo ao longo do semestre.
+Este repositório contém a versão final do jogo, que evoluiu de um template básico para um arcade de corrida endless runner com mecânicas de esquiva, coleta de itens e progressão de dificuldade, ambientado em uma estética Cyberpunk/Retrowave.
 
-## Integrantes do grupo
+Integrantes do grupo
+Luis Guilherme Pacheco Noacco
 
-- Luis Guilherme Pacheco Noacco
-- Matheus Henrique Barbosa de Andrade 
-- Arthur Nunes Cristóvão 
-- Davi Lavalle Carneiro
+Matheus Henrique Barbosa de Andrade
 
-## Estrutura do projeto
+Arthur Nunes Cristóvão
 
-- `main.py`: ponto de entrada da aplicação.
-- `src/`: código-fonte principal do jogo (loop, regras, sprites e dados).
-- `assets/`: imagens, fontes e sons.
-- `data/`: arquivos persistentes (recorde/ranking).
-- `tests/`: testes unitários com `pytest`.
-- `docs/`: documentação do projeto, incluindo proposta inicial.
+Davi Lavalle Carneiro
 
-## Descrição do jogo
+Estrutura do projeto
+main.py: ponto de entrada da aplicação.
 
-Descreva brevemente a ideia principal do jogo.
+src/: código-fonte principal do jogo (loop, regras, sprites e dados).
 
-Exemplo:
+assets/: imagens, fontes e sons.
 
-> O jogo consiste em controlar um personagem que deve coletar moedas e evitar obstáculos. O jogador ganha pontos ao coletar itens e perde vidas ao colidir com obstáculos. A partida termina quando o tempo acaba ou quando o jogador perde todas as vidas.
+data/: arquivos persistentes (recorde/ranking).
 
-## Objetivo do jogador
+tests/: testes unitários com pytest.
 
-Explique o que o jogador precisa fazer para vencer ou avançar no jogo.
+docs/: documentação do projeto, incluindo proposta inicial.
 
-Exemplo:
+Descrição do jogo
+Cyberdelivery é um jogo arcade de reflexos rápidos com visão top-down. O jogador controla um entregador em uma hoverbike (moto flutuante) de alta velocidade, cruzando uma rodovia futurista de 3 faixas. É preciso desviar do tráfego intenso de veículos, poças perigosas e ataques de feixes de laser, tudo isso sob a iluminação de prédios em neon.
 
-> O objetivo é coletar a maior quantidade possível de itens antes que o tempo acabe, evitando colisões com os obstáculos.
+Objetivo do jogador
+O objetivo é sobreviver o maior tempo possível na rodovia para alcançar a maior pontuação (Recorde). Para isso, o jogador deve coletar entregas (pontos e escudos) para acumular multiplicadores de combo, enquanto desvia de todos os obstáculos que surgem na pista em velocidades cada vez maiores.
 
-## Regras do jogo
+Regras do jogo
+Faixas de Movimento: A pista possui 3 faixas. A moto transita instantaneamente entre elas.
 
-Liste as principais regras do jogo.
+Coletáveis (Entregas):
 
-Exemplo:
+Caixas: Concedem pontos e aumentam o multiplicador de Combo (até 5x).
 
-- O jogador se movimenta usando as setas do teclado.
-- Cada item coletado aumenta a pontuação.
-- Colidir com um obstáculo reduz a quantidade de vidas.
-- A partida termina quando o jogador perde todas as vidas ou quando o tempo acaba.
+Escudos: Criam uma barreira de energia azul em volta da moto que absorve exatamente 1 impacto.
 
-## Controles
+Obstáculos e Perigos:
 
-Informe as teclas ou comandos utilizados no jogo.
+Carros: Colidir com veículos causa dano, zera o combo e consome 1 vida (se o jogador não tiver escudo).
 
-Exemplo:
+Poças (Derrapagem): Passar por uma poça faz a moto girar em 360 graus, zerando o combo e jogando o jogador para uma faixa lateral aleatória.
 
-- Seta para cima: mover para cima
-- Seta para baixo: mover para baixo
-- Seta para esquerda: mover para esquerda
-- Seta para direita: mover para direita
-- Espaço: realizar ação
-- ESC: sair do jogo
+Laser: Um feixe vermelho mortal mira em uma faixa. Após um breve aviso visual translúcido, ele dispara. Ficar na faixa atingida causa dano severo.
 
-## Como executar o projeto
+Progressão: A cada meta de pontos atingida, o Nível do jogo sobe, aumentando a velocidade da pista e o spawn de obstáculos.
 
-### 1. Clonar o repositório
+Fim de Jogo: A partida termina (Game Over) quando o jogador perde todas as vidas.
 
-```bash
+Controles
+Seta para a Esquerda / Tecla A: Mudar para a faixa da esquerda
+
+Seta para a Direita / Tecla D: Mudar para a faixa da direita
+
+Seta Esquerda/Direita (no Menu): Alternar entre os modos de jogo ("Apresentação" ou "Souls-like")
+
+ENTER ou ESPAÇO: Iniciar a partida (no menu) ou Voltar ao menu (no Game Over)
+
+ESC: Pausar / Despausar o jogo
+
+Como executar o projeto
+1. Clonar o repositório e instalar dependências
+Bash
 git clone LINK_DO_REPOSITORIO
 cd NOME_DA_PASTA
 pip install -r requirements.txt
 python main.py
-```
+Como executar os testes
+Os testes unitários validam as lógicas de cálculo de pontuação com combos, sistema de dano e a condição de derrota.
 
-## Como executar os testes
-
-```bash
+Bash
 python -m pytest
-```
+🎧 Créditos e Assets Externos
+Para a composição da estética futurista do jogo, foram utilizados e adaptados os seguintes recursos externos:
 
-## Checklist mínimo para entrega
+Engine Principal: Desenvolvido puramente com Pygame CE.
 
-- Preencher este README com nome final, descrição real, regras e controles do jogo.
-- Atualizar `docs/proposta.MD` com a proposta do grupo.
-- Garantir que o jogo executa com `python main.py`.
-- Garantir que os testes passam com `pytest`.
+Trilha Sonora: A música de fundo "Neon Pursuit Override" foi gerada através de inteligência artificial especializada em áudio (Suno AI).
 
-## Observações para os alunos
-
-- Mantenham o código organizado em módulos pequenos e com responsabilidade clara.
-- Comentem partes importantes da lógica, principalmente regras do jogo.
-- Registrem decisões técnicas no README do grupo ao longo do desenvolvimento.
+Sprites (Hoverbike e Cenário): A pixel art base foi gerada com auxílio de inteligência artificial gráfica e posteriormente tratada, recortada e adaptada manualmente no código para suportar o formato spritesheet com transparências.
